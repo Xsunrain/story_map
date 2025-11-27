@@ -312,7 +312,7 @@
             });
 
             // 本地地图路径（需Live Server运行）
-            const geoJsonPath = "./中华人民共和国.json";
+            const geoJsonPath = "./china.json";
 
             $.getJSON(geoJsonPath, function(geoJSON) {
                 echarts.registerMap('ch', geoJSON);
