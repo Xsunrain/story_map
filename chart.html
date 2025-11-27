@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ECharts Demo - WebGIS</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+            background: #f5f7fa;
+            color: #333;
+        }
+        header {
+            padding: 12px 20px;
+            background: #2f6fb2;
+            color: #fff;
+        }
+        main {
+            padding: 18px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+        }
+        .chart-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 2px 8px rgba(30, 40, 50, 0.05);
+        }
+        .chart {
+            width: 100%;
+            height: 360px;
+        }
+        #geoChart {
+            height: 500px;
+        }
+        @media (max-width: 900px) {
+            .container { grid-template-columns: 1fr; }
+            .chart { height: 300px; }
+            #geoChart { height: 400px; }
+        }
+        footer { padding: 12px 18px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>ECharts 可视化示例</h1>
+    </header>
+    <main>
+        <p>这个示例展示如何在一个简单网页中使用 ECharts 渲染图表。示例使用 <strong>CDN</strong> 引入 echarts，这样你无需安装依赖。</p>
+
+        <div class="container">
+            <section class="chart-card">
+                <h3>柱状图（恩施州外出务工人口统计）</h3>
+                <div id="barChart" class="chart"></div>
+            </section>
+            <section class="chart-card">
+                <h3>饼图（外出务工人口占比）</h3>
+                <div id="pieChart" class="chart"></div>
+            </section>
+        </div>
+
+        <section class="chart-card" style="margin-top: 18px;">
+            <h3>恩施州外出务工路线图</h3>
+            <p>基于中国地图的外出务工路线可视化，支持缩放、拖拽，鼠标悬停查看详细信息（线条粗细/颜色按务工人数区分）。</p>
+            <div id="geoChart" class="chart"></div>
+        </section>
+    </main>
+
+    <script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <script>
+        // 初始化图表实例
+        const barChartInstance = echarts.init(document.getElementById('barChart'));
+        const pieChartInstance = echarts.init(document.getElementById('pieChart'));
+        const geoChartInstance = echarts.init(document.getElementById('geoChart'));
+
+        // 外出务工原始数据（替换“迁徙”为“外出务工”）
+        const migrantWorkerData = [
+            { 出发地: "恩施州", 出发地经度: 109.47, 出发地纬度: 30.17, 目的地类型: "东部（细分省市）", 目的地: "北京", 目的地经度: 116.4, 目的地纬度: 39.9, 务工人数: 19401, 备注: "直辖市，北方务工核心城市" },
+            { 出发地: "恩施州", 出发地经度: 109.47, 出发地纬度: 30.17, 目的地类型: "东部（细分省市）", 目的地: "广东（广州）", 目的地经度: 113.23, 目的地纬度: 23.16, 务工人数: 142222, 备注: "珠三角核心，劳务输入大省" },
+            { 出发地: "恩施州", 出发地经度: 109.47, 出发地纬度: 30.17, 目的地类型: "东部（细分省市）", 目的地: "上海", 目的地经度: 121.47, 目的地纬度: 31.23, 务工人数: 35992, 备注: "直辖市，长三角核心" },
+            { 出发地: "恩施州", 出发地经度: 109.47, 出发地纬度: 30.17, 目的地类型: "东部（细分省市）", 目的地: "浙江（杭州）", 目的地经度: 120.12, 目的地纬度: 30.26, 务工人数: 175686, 备注: "长三角主要务工目的地" },
+            { 出发地: "恩施州", 出发地经度: 109.47, 出发地纬度: 30.17, 目的地类型: "东部（细分省市）", 目的地: "江苏（南京）", 目的地经度: 118.78, 目的地纬度: 32.04, 务工人数: 67328, 备注: "长三角工业强省" },
+            { 出发地: "恩施州", 出发地经度: 109.47, 出发地纬度: 30.17, 目的地类型: "西部区域", 目的地: "西部（成都）", 目的地经度: 104.06, 目的地纬度: 30.67, 务工人数: 72433, 备注: "西南区域核心城市" },
+            { 出发地: "恩施州", 出发地经度: 109.47, 出发地纬度: 30.17, 目的地类型: "中部区域", 目的地: "中部（武汉）", 目的地经度: 114.31, 目的地纬度: 30.52, 务工人数: 415015, 备注: "华中区域核心，省内务工集中" },
+            { 出发地: "恩施州", 出发地经度: 109.47, 出发地纬度: 30.17, 目的地类型: "东北地区", 目的地: "东北（沈阳）", 目的地经度: 123.38, 目的地纬度: 41.8, 务工人数: 22681, 备注: "东北区域核心城市" }
+        ];
+
+        // 柱状图配置（替换“迁出”为“外出务工”）
+        const barOption = {
+            title: { text: '各城市外出务工人口数量', left: 'center', fontSize: 14 },
+            tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+            grid: { left: '10%', right: '5%', bottom: '15%', top: '20%', containLabel: true },
+            xAxis: {
+                type: 'category',
+                data: migrantWorkerData.map(item => item.目的地),
+                axisLabel: { rotate: 30, fontSize: 11 }
+            },
+            yAxis: { type: 'value', name: '人数（人）', nameTextStyle: { fontSize: 11 } },
+            series: [{
+                name: '外出务工人数',
+                type: 'bar',
+                data: migrantWorkerData.map(item => item.务工人数),
+                itemStyle: {
+                    color: params => {
+                        const type = migrantWorkerData[params.dataIndex].目的地类型;
+                        return type.includes("东部") ? "#3498db" :
+                               type.includes("西部") ? "#2ecc71" :
+                               type.includes("中部") ? "#f39c12" : "#9b59b6";
+                    }
+                },
+                label: { show: true, position: 'top', fontSize: 10, formatter: val => val.toLocaleString() }
+            }]
+        };
+        barChartInstance.setOption(barOption);
+
+        // 饼图配置（替换“迁出”为“外出务工”）
+        const pieOption = {
+            title: { text: '外出务工人口占比分布', left: 'center', fontSize: 14 },
+            tooltip: { trigger: 'item', formatter: '{b}: {c}人 ({d}%)' },
+            legend: { orient: 'vertical', left: 'left', fontSize: 11 },
+            series: [{
+                name: '外出务工人数',
+                type: 'pie',
+                radius: ['40%', '70%'],
+                avoidLabelOverlap: false,
+                itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
+                label: { show: false, position: 'center' },
+                emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
+                labelLine: { show: false },
+                data: migrantWorkerData.map(item => ({ name: item.目的地, value: item.务工人数 }))
+            }]
+        };
+        pieChartInstance.setOption(pieOption);
+
+        // 【核心功能】按务工人数获取线条颜色（分区间设置不同颜色）
+        function getLineColorByCount(count) {
+            if (count >= 200000) return '#d32f2f'; // 20万以上：深红色（最高级）
+            if (count >= 100000) return '#c2185b'; // 10-20万：深粉色
+            if (count >= 50000) return '#7b1fa2';  // 5-10万：深紫色
+            if (count >= 20000) return '#5e35b1';  // 2-5万：紫色
+            return '#3949ab';                      // 2万以下：深蓝色（最低级）
+        }
+
+        // 【核心功能】按务工人数获取线条宽度（动态调整，差异更明显）
+        function getLineWidthByCount(count) {
+            return 1.5 + Math.log10(Math.max(count, 1)) * 2.5;
+        }
+
+        // 外出务工路线图配置（重点优化：箭头更醒目 + 文本替换）
+        function createMigrantWorkerChart(geoJSON) {
+            const chRoughLatitude = 35;
+            const nodes = [];
+            const edges = [];
+            const uniqueCities = new Set();
+            const sourceCity = "恩施州";
+
+            // 出发地节点（替换“迁出地”为“出发地”）
+            nodes.push({
+                name: sourceCity,
+                value: [migrantWorkerData[0].出发地经度, migrantWorkerData[0].出发地纬度],
+                type: "出发地",
+                务工人数: migrantWorkerData.reduce((total, item) => total + item.务工人数, 0), // 总务工人数
+                备注: "务工出发地核心",
+                itemStyle: { color: "#e74c3c" }
+            });
+            uniqueCities.add(sourceCity);
+
+            // 目的地节点和连线（优化箭头样式 + 文本替换）
+            migrantWorkerData.forEach(item => {
+                const targetCity = item.目的地;
+                const workerCount = item.务工人数 || 0;
+                if (!uniqueCities.has(targetCity) && item.目的地经度 && item.目的地纬度) {
+                    // 目的地节点（替换“迁入地”为“目的地”）
+                    nodes.push({
+                        name: targetCity,
+                        value: [item.目的地经度, item.目的地纬度],
+                        type: item.目的地类型 || "未知类型",
+                        务工人数: workerCount,
+                        备注: item.备注 || "无备注",
+                        itemStyle: {
+                            color: item.目的地类型.includes("东部") ? "#3498db" :
+                                   item.目的地类型.includes("西部") ? "#2ecc71" :
+                                   item.目的地类型.includes("中部") ? "#f39c12" : "#9b59b6"
+                        }
+                    });
+                    uniqueCities.add(targetCity);
+
+                    // 务工路线连线（箭头优化：增大箭头尺寸 + 调整位置，更醒目）
+                    edges.push({
+                        source: sourceCity,
+                        target: targetCity,
+                        务工人数: workerCount,
+                        目的地类型: item.目的地类型 || "未知类型",
+                        备注: item.备注 || "无备注",
+                        lineStyle: {
+                            width: getLineWidthByCount(workerCount), // 动态宽度
+                            color: getLineColorByCount(workerCount),  // 按人数配色
+                            opacity: 0.9
+                        }
+                    });
+                }
+            });
+
+            const geoOption = {
+                title: { text: '恩施州外出务工路线图', subtext: '线条粗细/颜色按务工人数区分（箭头指向目的地）', left: 'center' },
+                tooltip: {
+                    trigger: 'item',
+                    formatter: function(params) {
+                        if (!params.data) return `未知数据：${params.name || '无名称'}`;
+                        
+                        // 线条tooltip：突出显示务工人数
+                        if (params.dataType === "edge") {
+                            return `
+                                <div style="text-align:left; padding:5px; border:1px solid #eee; border-radius:4px;">
+                                    <strong style="color:${params.data.lineStyle.color};">务工路线：${params.data.source} → ${params.data.target}</strong><br/>
+                                    <span>目的地类型：${params.data.目的地类型}</span><br/>
+                                    <span style="font-weight:bold; color:#d32f2f;">务工人数：${params.data.务工人数.toLocaleString()}人</span><br/>
+                                    <span>备注：${params.data.备注}</span>
+                                </div>
+                            `;
+                        }
+                        // 出发地节点tooltip
+                        else if (params.data.type === "出发地") {
+                            return `<div style="text-align:left"><strong>${params.name}</strong><br/>类型：${params.data.type}<br/>坐标：${(params.data.value[0] || 0).toFixed(2)}, ${(params.data.value[1] || 0).toFixed(2)}<br/>总务工人数：${params.data.务工人数.toLocaleString()}人</div>`;
+                        }
+                        // 目的地节点tooltip
+                        else if (params.seriesType === "graph") {
+                            return `<div style="text-align:left"><strong>${params.name}</strong><br/>类型：${params.data.type}<br/>坐标：${(params.data.value[0] || 0).toFixed(2)}, ${(params.data.value[1] || 0).toFixed(2)}<br/>务工人数：${params.data.务工人数.toLocaleString()}人<br/>备注：${params.data.备注}</div>`;
+                        }
+                        return params.name || '无名称';
+                    },
+                    textStyle: { fontSize: 11 },
+                    padding: 10
+                },
+                // 图例文本替换
+                legend: {
+                    data: [
+                        { name: '20万以上', icon: 'line', lineStyle: { color: '#d32f2f', width: 4 } },
+                        { name: '10-20万', icon: 'line', lineStyle: { color: '#c2185b', width: 3 } },
+                        { name: '5-10万', icon: 'line', lineStyle: { color: '#7b1fa2', width: 2.5 } },
+                        { name: '2-5万', icon: 'line', lineStyle: { color: '#5e35b1', width: 2 } },
+                        { name: '2万以下', icon: 'line', lineStyle: { color: '#3949ab', width: 1.5 } }
+                    ],
+                    bottom: 10,
+                    left: 'center',
+                    fontSize: 11,
+                    itemWidth: 20,
+                    itemHeight: 3
+                },
+                geo: {
+                    map: 'ch',
+                    roam: true,
+                    aspectScale: Math.cos((chRoughLatitude * Math.PI) / 180),
+                    label: { show: true, textBorderColor: '#fff', textBorderWidth: 1, fontSize: 10 },
+                    itemStyle: { areaColor: '#ecf0f1', borderColor: '#bdc3c7' },
+                    emphasis: { itemStyle: { areaColor: '#34495e' }, label: { color: '#fff' } }
+                },
+                series: [{
+                    type: 'graph',
+                    coordinateSystem: 'geo',
+                    layout: 'none',
+                    data: nodes,
+                    edges: edges,
+                    // 【箭头优化】增大箭头尺寸（从8调整为12），优化箭头位置，确保指向清晰
+                    edgeSymbol: ['none', 'arrow'],
+                    edgeSymbolSize: [0, 40], // 箭头大小：12px（原8px，更醒目）
+                    edgeSymbolOffset: [0, 5], // 箭头偏移：靠近目的地节点，避免悬空
+                    // 线条标签：显示务工人数
+                    edgeLabel: {
+                        show: true,
+                        fontSize: 10,
+                        color: '#333',
+                        backgroundColor: 'rgba(255,255,255,0.8)',
+                        padding: [2, 5],
+                        borderRadius: 3,
+                        formatter: params => params.data.务工人数 >= 10000 ? (params.data.务工人数 / 10000).toFixed(1) + '万' : params.data.务工人数 + '人'
+                    },
+                    lineStyle: {
+                        curveness: 0.15, // 线条轻微弯曲，箭头方向更直观
+                        cap: 'round' // 线条端点圆润，与箭头衔接更自然
+                    },
+                    itemStyle: { borderColor: '#fff', borderWidth: 1, shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.2)' },
+                    symbolSize: function(params) {
+                        if (!params.data) return 10;
+                        return params.data.type === "出发地" ? 18 :
+                               10 + Math.log10(Math.max(params.data.务工人数, 1)) * 1.5;
+                    },
+                    label: {
+                        show: true,
+                        fontSize: 10,
+                        formatter: params => {
+                            if (!params.name) return '未知城市';
+                            return params.name.length > 6 ? params.name.substring(0, 6) + '...' : params.name;
+                        }
+                    }
+                }]
+            };
+            geoChartInstance.setOption(geoOption);
+        }
+
+        // 加载地图JSON
+        function fetchGeoJSON() {
+            geoChartInstance.showLoading({
+                text: '正在加载地图数据...',
+                maskColor: 'rgba(255,255,255,0.8)',
+                textColor: '#333'
+            });
+
+            // 本地地图路径（需Live Server运行）
+            const geoJsonPath = "./中华人民共和国.json";
+
+            $.getJSON(geoJsonPath, function(geoJSON) {
+                echarts.registerMap('ch', geoJSON);
+                createMigrantWorkerChart(geoJSON);
+                geoChartInstance.hideLoading();
+            }).fail(function(error) {
+                geoChartInstance.hideLoading();
+                alert('地图加载失败！已切换为备用地图数据...');
+                console.error('地图加载错误：', error);
+                // 备用方案：使用ECharts官方CDN地图
+                try {
+                    const cdnGeoJsonPath = "https://cdn.bootcdn.net/ajax/libs/echarts/map/json/china.json";
+                    $.getJSON(cdnGeoJsonPath, function(cdnGeoJSON) {
+                        echarts.registerMap('ch', cdnGeoJSON);
+                        createMigrantWorkerChart(cdnGeoJSON);
+                    });
+                } catch (e) {
+                    alert('备用地图也加载失败，请检查网络或JSON文件！');
+                }
+            });
+        }
+
+        // 初始化地图
+        fetchGeoJSON();
+
+        // 窗口自适应
+        window.addEventListener('resize', function() {
+            barChartInstance.resize();
+            pieChartInstance.resize();
+            geoChartInstance.resize();
+        });
+    </script>
+</body>
+</html>
